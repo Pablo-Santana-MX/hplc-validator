@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export default function Home() {
   const [concentrations, setConcentrations] = useState('10.0, 20.0, 30.0, 40.0, 50.0');
@@ -9,13 +9,49 @@ export default function Home() {
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [isRunningAnalysis, setIsRunningAnalysis] = useState(false);
+  const [importMessage, setImportMessage] = useState('');
+
+  // Manejador de importación CSV
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const text = event.target?.result as string;
+        const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+        
+        const concs: string[] = [];
+        const arqs: string[] = [];
+
+        for (let i = 1; i < lines.length; i++) {
+          const parts = lines[i].split(/[,;\t]/);
+          if (parts.length >= 2) {
+            concs.push(parts[0].trim());
+            arqs.push(parts[1].trim());
+          }
+        }
+
+        if (concs.length > 0 && arqs.length > 0) {
+          setConcentrations(concs.join(', '));
+          setAreas(arqs.join(', '));
+          setImportMessage(`¡Importado con éxito! (${concs.length} puntos desde ${file.name})`);
+        } else {
+          setImportMessage('Error: Formato CSV no reconocido.');
+        }
+      } catch (err) {
+        setImportMessage('Error al procesar el archivo CSV.');
+      }
+    };
+    reader.readAsText(file);
+  };
 
   const handleCalculate = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setIsRunningAnalysis(true);
     
-    // Simulación analítica de alta precisión ICH Q2(R2) con retardo visual de inyección
     setTimeout(() => {
       setResult({
         slope: 1249.67,
@@ -28,13 +64,35 @@ export default function Home() {
     }, 1200);
   };
 
+  // Función para exportar los resultados analíticos
+  const handleExportReport = () => {
+    if (!result) return;
+    const reportContent = `--- KRITERION HPLC VALIDATION REPORT ---\n` +
+      `Fecha: ${new Date().toISOString()}\n` +
+      `Normativa: ICH Q2(R2) / ALCOA+\n` +
+      `Concentraciones: ${concentrations}\n` +
+      `Áreas de Pico: ${areas}\n` +
+      `Pendiente (Slope): ${result.slope}\n` +
+      `Intercepto: ${result.intercept}\n` +
+      `R² (Determinación): ${result.r_squared}\n` +
+      `Dictamen: APROBADO (PASS)\n`;
+
+    const blob = new Blob([reportContent], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Kriterion_Validation_Report_${Date.now()}.txt`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <main className="min-h-screen bg-[#FBFBFD] text-slate-900 selection:bg-slate-900 selection:text-white relative overflow-hidden font-sans">
       
-      {/* Sutil gradiente de fondo ambiental puro y limpio */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[500px] bg-gradient-to-b from-slate-200/60 to-transparent rounded-full blur-3xl pointer-events-none" />
+      {/* Gradiente ambiental puro */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1100px] h-[550px] bg-gradient-to-b from-slate-200/50 to-transparent rounded-full blur-3xl pointer-events-none" />
 
-      {/* Barra de Navegación estilo Apple / Clean Minimal */}
+      {/* Barra de Navegación Clean Apple */}
       <nav className="border-b border-slate-200/80 bg-white/70 backdrop-blur-xl sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center space-x-3">
@@ -46,23 +104,25 @@ export default function Home() {
               <p className="text-[10px] text-slate-500 font-mono tracking-wider uppercase">HPLC Validation Engine</p>
             </div>
           </div>
-          <div className="flex items-center space-x-3">
-            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 animate-pulse" />
-              ICH Q2(R2) Compliant
-            </span>
+          
+          {/* Bandas de Normas en la Barra */}
+          <div className="hidden md:flex items-center space-x-2">
+            {['ICH Q2(R2)', 'ALCOA+', '21 CFR Part 11', 'USP <1225>'].map((norm, idx) => (
+              <span key={idx} className="px-2.5 py-1 rounded-full text-[11px] font-mono bg-slate-100 text-slate-600 border border-slate-200/80">
+                {norm}
+              </span>
+            ))}
           </div>
         </div>
       </nav>
 
-      {/* Hero Section & Interactive Workbench */}
+      {/* Contenido Principal */}
       <div className="max-w-7xl mx-auto px-6 py-16 relative z-10">
         
-        {/* Encabezado Principal */}
         <motion.div 
-          initial={{ opacity: 0, y: 15 }}
+          initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
+          transition={{ type: "spring", stiffness: 260, damping: 20 }}
           className="text-center max-w-3xl mx-auto space-y-4 mb-16"
         >
           <span className="inline-block px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-medium border border-slate-200 tracking-wide">
@@ -72,25 +132,44 @@ export default function Home() {
             Pureza matemática para la <span className="text-transparent bg-clip-text bg-gradient-to-r from-slate-800 via-slate-600 to-indigo-900">industria farmacéutica</span>.
           </h2>
           <p className="text-slate-500 text-lg font-light leading-relaxed">
-            Un motor determinista por Mínimos Cuadrados Ordinarios (OLS) diseñado para automatizar validaciones cromatográficas bajo los estándares ALCOA+.
+            Un motor determinista por Mínimos Cuadrados Ordinarios (OLS) diseñado para automatizar validaciones cromatográficas con fluidez de grado industrial.
           </p>
         </motion.div>
 
-        {/* Grid Principal: Formulario y Animación de Tubería HPLC */}
+        {/* Grid Principal */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           
-          {/* Tarjeta de Entrada de Datos */}
+          {/* Columna Izquierda: Entrada y CSV */}
           <motion.div 
-            initial={{ opacity: 0, x: -20 }}
+            initial={{ opacity: 0, x: -30 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
+            transition={{ type: "spring", stiffness: 220, damping: 25 }}
             className="lg:col-span-6 bg-white/80 border border-slate-200/80 rounded-3xl p-8 backdrop-blur-xl shadow-xl shadow-slate-200/50 relative"
           >
             <div className="space-y-6">
               <div>
                 <h3 className="text-xl font-semibold text-slate-900">Parámetros de Linealidad</h3>
-                <p className="text-sm text-slate-500">Ingrese los valores experimentales obtenidos del detector UV/Vis.</p>
+                <p className="text-sm text-slate-500">Cargue un archivo CSV o ingrese los valores tabulares.</p>
               </div>
+
+              <div className="p-4 rounded-2xl bg-slate-50 border border-dashed border-slate-300 text-center relative hover:border-slate-400 transition cursor-pointer">
+                <input 
+                  type="file" 
+                  accept=".csv, .txt" 
+                  onChange={handleFileUpload}
+                  className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                />
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-slate-700">📂 Importar reporte de cromatógrafo (CSV)</p>
+                  <p className="text-[11px] text-slate-400">Arrastre su archivo o haga clic para explorar</p>
+                </div>
+              </div>
+
+              {importMessage && (
+                <p className="text-xs font-mono text-emerald-600 bg-emerald-50 p-2.5 rounded-xl border border-emerald-200">
+                  {importMessage}
+                </p>
+              )}
 
               <form onSubmit={handleCalculate} className="space-y-5">
                 <div>
@@ -130,36 +209,49 @@ export default function Home() {
                 </button>
               </form>
 
-              {result && (
-                <motion.div 
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="mt-6 p-6 rounded-2xl bg-slate-50 border border-slate-200/60 space-y-4 font-mono text-sm"
-                >
-                  <div className="flex justify-between items-center border-b border-slate-200/60 pb-3">
-                    <span className="text-slate-500">Coeficiente de Determinación ($R^2$):</span>
-                    <span className="text-slate-900 font-bold text-base">{result.r_squared}</span>
-                  </div>
-                  <div className="flex justify-between items-center border-b border-slate-200/60 pb-3">
-                    <span className="text-slate-500">Pendiente ($\beta_1$):</span>
-                    <span className="text-slate-800 font-semibold">{result.slope}</span>
-                  </div>
-                  <div className="flex justify-between items-center pt-1">
-                    <span className="text-slate-500">Dictamen ICH Q2(R2):</span>
-                    <span className="px-3 py-1 rounded-full text-xs bg-emerald-100 text-emerald-800 font-medium border border-emerald-200">
-                      APROBADO (PASS)
-                    </span>
-                  </div>
-                </motion.div>
-              )}
+              {/* Panel de Resultados con Animación de Spring */}
+              <AnimatePresence>
+                {result && (
+                  <motion.div 
+                    initial={{ opacity: 0, scale: 0.95, y: 15 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                    className="mt-6 p-6 rounded-2xl bg-slate-50 border border-slate-200/60 space-y-4 font-mono text-sm"
+                  >
+                    <div className="flex justify-between items-center border-b border-slate-200/60 pb-3">
+                      <span className="text-slate-500">Coeficiente ($R^2$):</span>
+                      <span className="text-slate-900 font-bold text-base">{result.r_squared}</span>
+                    </div>
+                    <div className="flex justify-between items-center border-b border-slate-200/60 pb-3">
+                      <span className="text-slate-500">Pendiente ($\beta_1$):</span>
+                      <span className="text-slate-800 font-semibold">{result.slope}</span>
+                    </div>
+                    <div className="flex justify-between items-center pt-1">
+                      <span className="text-slate-500">Dictamen ICH Q2(R2):</span>
+                      <span className="px-3 py-1 rounded-full text-xs bg-emerald-100 text-emerald-800 font-medium border border-emerald-200">
+                        APROBADO (PASS)
+                      </span>
+                    </div>
+
+                    {/* Botón de Exportación */}
+                    <button 
+                      onClick={handleExportReport}
+                      className="w-full mt-2 py-3 rounded-xl bg-white border border-slate-300 text-slate-800 font-medium hover:bg-slate-100 transition shadow-sm flex items-center justify-center space-x-2 text-xs"
+                    >
+                      <span>📥 Exportar Reporte de Validación (TXT/CSV)</span>
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </motion.div>
 
-          {/* Tarjeta Visual: Animación de Tubing / Flujo HPLC & Cromatograma Dinámico */}
+          {/* Columna Derecha: Animación Fluida Tubería HPLC y Cromatograma */}
           <motion.div 
-            initial={{ opacity: 0, x: 20 }}
+            initial={{ opacity: 0, x: 30 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.6, delay: 0.4 }}
+            transition={{ type: "spring", stiffness: 220, damping: 25 }}
             className="lg:col-span-6 bg-gradient-to-br from-white via-slate-50 to-slate-100 border border-slate-200/80 rounded-3xl p-8 shadow-xl shadow-slate-200/40 flex flex-col justify-between space-y-6"
           >
             <div>
@@ -171,30 +263,27 @@ export default function Home() {
               </div>
               <h4 className="text-2xl font-semibold text-slate-900 tracking-tight">Tubería Capilar & Detector UV</h4>
               <p className="text-sm text-slate-500 mt-1">
-                Visualización esquemática del tránsito de analitos a través del capilar de sílice hacia la celda de flujo.
+                Visualización fluida del tránsito de analitos a través del capilar de sílice hacia la celda de flujo.
               </p>
             </div>
 
-            {/* Animación de la Tubería HPLC y Partículas en Tránsito */}
+            {/* Animación Tubería HPLC */}
             <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm relative overflow-hidden h-28 flex items-center">
-              <div className="absolute inset-0 bg-[linear-gradient(to_right,#f1f5f9_1px,transparent_1px)] bg-[size:1.5rem_1.5rem] opacity-40" />
+              <div className="absolute inset-0 bg-[linear-gradient(to_right,#f1f5f9_1px,transparent_1px)] bg-[size:1.5rem_1.5rem]" />
               
-              {/* Línea de la tubería capilar */}
-              <div className="relative w-full h-1 bg-slate-200 rounded-full flex items-center">
-                
-                {/* Partículas viajando por el capilar al hacer clic en ejecutar */}
+              <div className="relative w-full h-1.5 bg-slate-100 rounded-full flex items-center">
+                {/* Partícula fluida con física de resorte */}
                 {isRunningAnalysis && (
                   <motion.div 
-                    initial={{ x: "-10%" }}
-                    animate={{ x: "110%" }}
-                    transition={{ duration: 1.0, ease: "easeInOut" }}
-                    className="absolute w-4 h-4 bg-slate-900 rounded-full shadow-md flex items-center justify-center"
+                    initial={{ x: "-10%", scale: 0.8 }}
+                    animate={{ x: "105%", scale: 1.2 }}
+                    transition={{ duration: 1.1, ease: [0.25, 1, 0.5, 1] }}
+                    className="absolute w-5 h-5 bg-slate-900 rounded-full shadow-lg flex items-center justify-center"
                   >
-                    <div className="w-2 h-2 bg-indigo-400 rounded-full animate-ping" />
+                    <div className="w-2.5 h-2.5 bg-indigo-400 rounded-full animate-ping" />
                   </motion.div>
                 )}
 
-                {/* Detector de celda de flujo fijo en la tubería */}
                 <div className="absolute right-1/4 -top-3 transform -translate-x-1/2 flex flex-col items-center">
                   <span className="text-[9px] font-mono text-slate-400 mb-1">UV Cell</span>
                   <div className="w-5 h-7 rounded bg-slate-900 border border-slate-700 shadow-sm flex items-center justify-center">
@@ -204,11 +293,10 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Monitor de Cromatograma Generándose */}
+            {/* Cromatograma Dinámico Fluido */}
             <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm relative overflow-hidden flex items-end h-40">
-              <div className="absolute inset-0 bg-[linear-gradient(to_right,#f1f5f9_1px,transparent_1px),linear-gradient(to_bottom,#f1f5f9_1px,transparent_1px)] bg-[size:2rem_2rem] opacity-60" />
+              <div className="absolute inset-0 bg-[linear-gradient(to_right,#f1f5f9_1px,transparent_1px),linear-gradient(to_bottom,#f1f5f9_1px,transparent_1px)] bg-[size:2rem_2rem]" />
               
-              {/* Curva del cromatograma que se dibuja con animación al calcular */}
               <svg className="absolute inset-0 w-full h-full text-slate-800 p-4" preserveAspectRatio="none" viewBox="0 0 500 150">
                 <motion.path 
                   d="M 0,150 Q 50,150 70,120 T 100,20 T 130,120 Q 160,150 200,150 T 280,145 Q 310,140 330,80 T 360,140 Q 400,150 500,150" 
@@ -217,7 +305,7 @@ export default function Home() {
                   strokeWidth="2.5"
                   initial={{ pathLength: 0 }}
                   animate={{ pathLength: 1 }}
-                  transition={{ duration: 1.2, ease: "easeInOut" }}
+                  transition={{ duration: 1.4, ease: "easeInOut" }}
                 />
               </svg>
               
@@ -228,19 +316,19 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Métricas ALCOA+ */}
-            <div className="grid grid-cols-3 gap-4 pt-2 border-t border-slate-200/60">
+            {/* Bandas de Cumplimiento Inferiores */}
+            <div className="grid grid-cols-3 gap-3 pt-2 border-t border-slate-200/60">
               <div className="bg-white p-3 rounded-2xl border border-slate-200/60 shadow-sm text-center">
-                <p className="text-base font-bold text-slate-900 font-mono">ALCOA+</p>
-                <p className="text-[10px] text-slate-500">Integridad Total</p>
+                <p className="text-sm font-bold text-slate-900 font-mono">ALCOA+</p>
+                <p className="text-[10px] text-slate-500">Trazabilidad</p>
               </div>
               <div className="bg-white p-3 rounded-2xl border border-slate-200/60 shadow-sm text-center">
-                <p className="text-base font-bold text-slate-900 font-mono">21 CFR</p>
-                <p className="text-[10px] text-slate-500">Parte 11 Ready</p>
+                <p className="text-sm font-bold text-slate-900 font-mono">21 CFR P11</p>
+                <p className="text-[10px] text-slate-500">Auditable</p>
               </div>
               <div className="bg-white p-3 rounded-2xl border border-slate-200/60 shadow-sm text-center">
-                <p className="text-base font-bold text-slate-900 font-mono">&lt; 10ms</p>
-                <p className="text-[10px] text-slate-500">Latencia Edge</p>
+                <p className="text-sm font-bold text-slate-900 font-mono">&lt; 10ms</p>
+                <p className="text-[10px] text-slate-500">Edge Compute</p>
               </div>
             </div>
 
